@@ -2954,6 +2954,59 @@ class invwishart_gen(wishart_gen):
         out = self._var(dim, df, scale)
         return _squeeze_output(out) if out is not None else out
 
+    def _inv_standard_rvs(self, n, shape, dim, df, random_state):
+        """
+        Parameters
+        ----------
+        n : integer
+            Number of variates to generate
+        shape : iterable
+            Shape of the variates to generate
+        dim : int
+            Dimension of the scale matrix
+        df : int
+            Degrees of freedom
+        random_state : {None, int, `numpy.random.Generator`,
+                        `numpy.random.RandomState`}, optional
+
+            If `seed` is None (or `np.random`), the `numpy.random.RandomState`
+            singleton is used.
+            If `seed` is an int, a new ``RandomState`` instance is used,
+            seeded with `seed`.
+            If `seed` is already a ``Generator`` or ``RandomState`` instance
+            then that instance is used.
+
+        Notes
+        -----
+        As this function does no argument checking, it should not be
+        called directly; use 'rvs' instead.
+
+        """
+        # Random normal variates for off-diagonal elements
+        n_tril = dim * (dim-1) // 2
+        covariances = random_state.normal(
+            size=n*n_tril).reshape(shape+(n_tril,))
+
+        # Random chi-square variates for diagonal elements
+        variances = (np.r_[[random_state.chisquare(df+(i+1)-dim, size=n)**0.5
+                            for i in range(dim)]].reshape((dim,) +
+                                                          shape[::-1]).T)
+
+        # Create A matri(ces) - lower triangular
+        # where inv(A) @ inv(A).T ~ invwishart(df, I)
+        A = np.zeros(shape + (dim, dim))
+
+        # Input the covariances
+        size_idx = tuple([slice(None, None, None)]*len(shape))
+        tril_idx = np.tril_indices(dim, k=-1)
+        A[size_idx + tril_idx] = covariances
+
+        # Input the variances
+        diag_idx = np.diag_indices(dim)
+        A[size_idx + diag_idx] = variances
+
+        return A
+
     def _rvs(self, n, shape, dim, df, C, random_state):
         """Draw random samples from an inverse Wishart distribution.
 
