@@ -3032,25 +3032,23 @@ class invwishart_gen(wishart_gen):
         """
         random_state = self._get_random_state(random_state)
         # Get random draws A such that A ~ W(df, I)
-        A = super()._standard_rvs(n, shape, dim, df, random_state)
+        A = self._inv_standard_rvs(n, shape, dim, df, random_state)
 
         # Calculate SA = (CA)'^{-1} (CA)^{-1} ~ iW(df, scale)
-        eye = np.eye(dim)
         trtrs = get_lapack_funcs(('trtrs'), (A,))
 
         for index in np.ndindex(A.shape[:-2]):
             # Calculate CA
-            CA = np.dot(C, A[index])
-            # Get (C A)^{-1} via triangular solver
+            # Get CA = (C A^{-1}).T via triangular solver
             if dim > 1:
-                CA, info = trtrs(CA, eye, lower=True)
+                CA, info = trtrs(A[index], C.T, lower=True, trans=True)
                 if info > 0:
                     raise LinAlgError("Singular matrix.")
                 if info < 0:
                     raise ValueError('Illegal value in %d-th argument of'
                                      ' internal trtrs' % -info)
             else:
-                CA = 1. / CA
+                CA = C / A[0]
             # Get SA
             A[index] = np.dot(CA.T, CA)
 
@@ -3080,12 +3078,9 @@ class invwishart_gen(wishart_gen):
         n, shape = self._process_size(size)
         dim, df, scale = self._process_parameters(df, scale)
 
-        # Invert the scale
-        eye = np.eye(dim)
-        L, lower = scipy.linalg.cho_factor(scale, lower=True)
-        inv_scale = scipy.linalg.cho_solve((L, lower), eye)
-        # Cholesky decomposition of inverted scale
-        C = scipy.linalg.cholesky(inv_scale, lower=True)
+        # Cholesky decomposition of scale
+        C, _ = scipy.linalg.cho_factor(scale, lower=True)
+        C = scipy.linalg.tril(C)
 
         out = self._rvs(n, shape, dim, df, C, random_state)
 
