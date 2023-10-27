@@ -2743,7 +2743,7 @@ class invwishart_gen(wishart_gen):
         """
         return invwishart_frozen(df, scale, seed)
 
-    def _logpdf(self, x, dim, df, scale, log_det_scale):
+    def _logpdf(self, x, dim, df, scale, log_det_scale, C):
         """Log of the inverse Wishart probability density function.
 
         Parameters
@@ -2759,6 +2759,8 @@ class invwishart_gen(wishart_gen):
             Scale matrix
         log_det_scale : float
             Logarithm of the determinant of the scale matrix
+        C : ndarray
+            Cholesky factorization of the scale matrix, lower triagular.
 
         Notes
         -----
@@ -2768,12 +2770,11 @@ class invwishart_gen(wishart_gen):
         """
         # Retrieve tr(scale x^{-1})
         log_det_x = np.empty(x.shape[-1])
-        inv_scale_x = np.empty(x.shape)
         tr_inv_scale_x = np.empty(x.shape[-1])
         for i in range(x.shape[-1]):
             Cx, log_det_x[i] = self._cholesky_logdet(x[:, :, i])
-            inv_scale_x[:, :, i] = scipy.linalg.cho_solve((Cx.T, False), scale)
-            tr_inv_scale_x[i] = inv_scale_x[:, :, i].trace()
+            A = scipy.linalg.solve_triangular(Cx, C, lower=True)
+            tr_inv_scale_x[i] = np.linalg.norm(A)**2
 
         # Log PDF
         out = ((0.5 * df * log_det_scale - 0.5 * tr_inv_scale_x) -
@@ -2804,8 +2805,8 @@ class invwishart_gen(wishart_gen):
         """
         dim, df, scale = self._process_parameters(df, scale)
         x = self._process_quantiles(x, dim)
-        _, log_det_scale = self._cholesky_logdet(scale)
-        out = self._logpdf(x, dim, df, scale, log_det_scale)
+        C, log_det_scale = self._cholesky_logdet(scale)
+        out = self._logpdf(x, dim, df, scale, log_det_scale, C)
         return _squeeze_output(out)
 
     def pdf(self, x, df, scale):
@@ -3129,7 +3130,7 @@ class invwishart_frozen(multi_rv_frozen):
     def logpdf(self, x):
         x = self._dist._process_quantiles(x, self.dim)
         out = self._dist._logpdf(x, self.dim, self.df, self.scale,
-                                 self.log_det_scale)
+                                 self.log_det_scale, self.C)
         return _squeeze_output(out)
 
     def pdf(self, x):
