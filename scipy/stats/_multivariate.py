@@ -3128,15 +3128,9 @@ class invwishart_frozen(multi_rv_frozen):
         )
 
         # Get the determinant via Cholesky factorization
-        C, lower = scipy.linalg.cho_factor(self.scale, lower=True)
-        self.log_det_scale = 2 * np.sum(np.log(C.diagonal()))
-
-        # Get the inverse using the Cholesky factorization
-        eye = np.eye(self.dim)
-        self.inv_scale = scipy.linalg.cho_solve((C, lower), eye)
-
-        # Get the Cholesky factorization of the inverse scale
-        self.C = scipy.linalg.cholesky(self.inv_scale, lower=True)
+        C, _ = scipy.linalg.cho_factor(self.scale, lower=True)
+        self.C = np.tril(C)
+        self.log_det_scale = 2 * np.sum(np.log(self.C.diagonal()))
 
     def logpdf(self, x):
         x = self._dist._process_quantiles(x, self.dim)
