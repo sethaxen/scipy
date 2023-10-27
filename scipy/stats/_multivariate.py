@@ -2766,23 +2766,17 @@ class invwishart_gen(wishart_gen):
         called directly; use 'logpdf' instead.
 
         """
+        # Retrieve tr(scale x^{-1})
         log_det_x = np.empty(x.shape[-1])
-        x_inv = np.copy(x).T
-        if dim > 1:
-            _cho_inv_batch(x_inv)  # works in-place
-        else:
-            x_inv = 1./x_inv
-        tr_scale_x_inv = np.empty(x.shape[-1])
-
+        inv_scale_x = np.empty(x.shape)
+        tr_inv_scale_x = np.empty(x.shape[-1])
         for i in range(x.shape[-1]):
-            C, lower = scipy.linalg.cho_factor(x[:, :, i], lower=True)
-
-            log_det_x[i] = 2 * np.sum(np.log(C.diagonal()))
-
-            tr_scale_x_inv[i] = np.dot(scale, x_inv[i]).trace()
+            Cx, log_det_x[i] = self._cholesky_logdet(x[:, :, i])
+            inv_scale_x[:, :, i] = scipy.linalg.cho_solve((Cx.T, False), scale)
+            tr_inv_scale_x[i] = inv_scale_x[:, :, i].trace()
 
         # Log PDF
-        out = ((0.5 * df * log_det_scale - 0.5 * tr_scale_x_inv) -
+        out = ((0.5 * df * log_det_scale - 0.5 * tr_inv_scale_x) -
                (0.5 * df * dim * _LOG_2 + 0.5 * (df + dim + 1) * log_det_x) -
                multigammaln(0.5*df, dim))
 
