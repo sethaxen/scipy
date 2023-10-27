@@ -3080,7 +3080,7 @@ class invwishart_gen(wishart_gen):
 
         # Cholesky decomposition of scale
         C, _ = scipy.linalg.cho_factor(scale, lower=True)
-        C = scipy.linalg.tril(C)
+        C = np.tril(C)
 
         out = self._rvs(n, shape, dim, df, C, random_state)
 
