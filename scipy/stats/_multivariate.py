@@ -3123,8 +3123,7 @@ class invwishart_frozen(multi_rv_frozen):
         )
 
         # Get the determinant via Cholesky factorization
-        C, _ = scipy.linalg.cho_factor(self.scale, lower=True)
-        self.C = np.tril(C)
+        self.C = scipy.linalg.cholesky(self.scale, lower=True)
         self.log_det_scale = 2 * np.sum(np.log(self.C.diagonal()))
 
     def logpdf(self, x):
